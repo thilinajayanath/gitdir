@@ -120,28 +120,24 @@ func walk(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
 }
 
 func createFS(dst string, fs billy.Filesystem, fileName <-chan fileInfo, src string) {
-	dstDir := createFulltPath(dst, src)
-	fmt.Println(dstDir)
-
-	err := os.RemoveAll(dstDir)
+	err := os.RemoveAll(dst)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	os.MkdirAll(dstDir, 0755)
+	os.MkdirAll(dst, 0755)
 
 	for x := range fileName {
-		fmt.Println(x.path, x.isDir, x.mode)
-		filePath := createFulltPath(dstDir, x.path)
+		filePath := createFulltPath(dst, x.path)
 		if x.isDir {
-			fmt.Println("dir path to create", filePath)
+			// fmt.Println("dir path to create", filePath)
 			err = os.Mkdir(filePath, 0755)
 			if err != nil {
 				fmt.Println("dir ", filePath, "creation falied", err.Error())
 			}
-			fmt.Println("dir created:", filePath)
+			// fmt.Println("dir created:", filePath)
 		} else {
-			fmt.Println("file path", filePath)
+			// fmt.Println("file path", filePath)
 			srcFilePath := createFulltPath(src, x.path)
 			srcFile, err := fs.Open(srcFilePath)
 			if err != nil {
