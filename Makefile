@@ -1,10 +1,10 @@
 .PHONY: run
 run: build
-	./bin/app $(file)
+	./bin/gitdir $(file)
 
 .PHONY: build
 build:
-	go build -o ./bin/app cmd/gitdir/main.go
+	go build -o ./bin/gitdir cmd/gitdir/main.go
 
 .PHONY: test
 test:

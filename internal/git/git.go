@@ -30,7 +30,7 @@ func CopyGitDir(c config.Config) {
 }
 
 func cloneDir(auth config.Auth, dst, repo, rev, src string) {
-	r, fs, err := cloneRepo(auth.Credentials["key"], repo)
+	r, fs, err := cloneRepo(auth, repo)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -57,24 +57,26 @@ func cloneDir(auth config.Auth, dst, repo, rev, src string) {
 	createFS(dst, fs, dirTreeChan, src)
 }
 
-func cloneRepo(keyFile, repo string) (*git.Repository, billy.Filesystem, error) {
+func cloneRepo(auth config.Auth, repo string) (*git.Repository, billy.Filesystem, error) {
 	// Filesystem abstraction based on memory
 	fs := memfs.New()
 	// Git objects storer based on memory
 	storer := memory.NewStorage()
 
-	authMethod, err := ssh.NewPublicKeysFromFile("git", keyFile, "")
-	if err != nil {
-		return &git.Repository{}, fs, err
+	co := &git.CloneOptions{URL: repo}
+
+	if auth.Type != "none" {
+		authMethod, err := ssh.NewPublicKeysFromFile("git", auth.Credentials["key"], "")
+		if err != nil {
+			return &git.Repository{}, fs, err
+		}
+		co.Auth = authMethod
 	}
 
 	r, err := git.Clone(
 		storer,
 		fs,
-		&git.CloneOptions{
-			URL:  repo,
-			Auth: authMethod,
-		},
+		co,
 	)
 	if err != nil {
 		return &git.Repository{}, fs, err
