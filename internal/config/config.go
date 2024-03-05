@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log/slog"
+	"log"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -31,19 +31,18 @@ type Directory struct {
 func GetConfig(cf string) (Config, error) {
 	content, err := os.ReadFile(cf)
 	if err != nil {
-		slog.Error("error with opening the configuraiton file")
+		log.Println("error with opening the configuraiton file")
 		return Config{}, err
-
 	}
 
 	c := Config{}
 
 	err = yaml.Unmarshal(content, &c)
 	if err != nil {
-		slog.Error("error with parsing the configuraiton file")
+		log.Println("error with parsing the configuraiton file")
 		return Config{}, err
 	}
 
-	slog.Info("parsed the configuration file successfully")
+	log.Println("parsed the configuration file successfully")
 	return c, nil
 }

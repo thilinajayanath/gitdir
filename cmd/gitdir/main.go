@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"log/slog"
+	"log"
 
 	"github.com/thilinajayanath/gitdir/internal/config"
 	"github.com/thilinajayanath/gitdir/internal/git"
@@ -19,10 +19,8 @@ func main() {
 
 	config, err := config.GetConfig(configFile)
 	if err != nil {
-		slog.Error(err.Error())
+		log.Fatalf("error with loading the configuration from file: %s\n", err.Error())
 	}
-
-	// fmt.Println(config)
 
 	git.CopyGitDir(config)
 }
