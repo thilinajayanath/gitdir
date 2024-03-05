@@ -3,6 +3,7 @@ package git
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 
@@ -30,31 +31,43 @@ func CopyGitDir(c config.Config) {
 }
 
 func cloneDir(auth config.Auth, dst, repo, rev, src string) {
+	log.Println("cloning repo ", repo)
+
 	r, fs, err := cloneRepo(auth, repo)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println("error with cloning the git repo:", repo)
+		log.Println("error: ", err.Error())
+		return
 	}
 
 	w, err := r.Worktree()
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println("error with retriving the git worktree for the repo: ", repo)
+		log.Println("error: ", err.Error())
+		return
 	}
 
 	err = w.Checkout(&git.CheckoutOptions{
 		Hash: plumbing.NewHash(rev),
 	})
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println("error with checking out the commit in repo: ", repo)
+		log.Println("error: ", err.Error())
+		return
 	}
 
 	srcFs, err := fs.Chroot(src)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println("error with changing to source directory to ", src)
+		log.Println("error: ", err.Error())
+		return
 	}
 
+	log.Println("copying files")
 	dirTreeChan := make(chan fileInfo)
 	go walk(srcFs, "/", dirTreeChan)
 	createFS(dst, fs, dirTreeChan, src)
+
 }
 
 func cloneRepo(auth config.Auth, repo string) (*git.Repository, billy.Filesystem, error) {
@@ -88,7 +101,7 @@ func cloneRepo(auth config.Auth, repo string) (*git.Repository, billy.Filesystem
 func walk(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
 	files, err := srcFs.ReadDir("/")
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 	}
 
 	for _, file := range files {
@@ -109,7 +122,7 @@ func walk(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
 		if file.IsDir() {
 			newSrcFs, err := srcFs.Chroot(file.Name())
 			if err != nil {
-				fmt.Println(err.Error())
+				log.Println(err.Error())
 			}
 
 			walk(newSrcFs, filePath, fileName)
@@ -124,38 +137,41 @@ func walk(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
 func createFS(dst string, fs billy.Filesystem, fileName <-chan fileInfo, src string) {
 	err := os.RemoveAll(dst)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 	}
 
 	os.MkdirAll(dst, 0755)
+	if err != nil {
+		log.Println(err.Error())
+	}
 
 	for x := range fileName {
 		filePath := createFulltPath(dst, x.path)
 		if x.isDir {
-			// fmt.Println("dir path to create", filePath)
 			err = os.Mkdir(filePath, 0755)
 			if err != nil {
-				fmt.Println("dir ", filePath, "creation falied", err.Error())
+				log.Println("dir ", filePath, "creation falied", err.Error())
 			}
-			// fmt.Println("dir created:", filePath)
 		} else {
-			// fmt.Println("file path", filePath)
 			srcFilePath := createFulltPath(src, x.path)
 			srcFile, err := fs.Open(srcFilePath)
 			if err != nil {
-				fmt.Println("src", err.Error())
-				os.Exit(1)
+				log.Println("src", err.Error())
 			}
 
 			dstFile, err := os.Create(filePath)
 			if err != nil {
-				fmt.Println("dst", err.Error())
-				os.Exit(1)
+				log.Println("dst", err.Error())
 			}
 
 			_, err = io.Copy(dstFile, srcFile)
 			if err != nil {
-				fmt.Println(err.Error())
+				log.Println(err.Error())
+			}
+
+			err = dstFile.Sync()
+			if err != nil {
+				log.Println(err.Error())
 			}
 
 			srcFile.Close()
