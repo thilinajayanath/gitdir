@@ -24,34 +24,34 @@ type fileInfo struct {
 
 func CopyGitDir(c config.Config) {
 	for _, repo := range c.Repos {
+		log.Println("cloning repo ", repo.URL)
+		r, fs, err := cloneRepo(repo.URL, repo.Auth)
+		if err != nil {
+			log.Println("error with cloning the git repo:", repo.URL)
+			log.Println("error: ", err.Error())
+			continue
+		}
+
+		w, err := r.Worktree()
+		if err != nil {
+			log.Println("error with retriving the git worktree for the repo: ", repo.URL)
+			log.Println("error: ", err.Error())
+			continue
+		}
+		log.Println(repo.URL, "cloned")
+
 		for _, dir := range repo.Directories {
-			cloneDir(repo.Auth, dir.Target, repo.URL, dir.Revision, dir.Source)
+			cloneDir(dir.Target, repo.URL, dir.Revision, dir.Source, fs, w)
 		}
 	}
 }
 
-func cloneDir(auth config.Auth, dst, repo, rev, src string) {
-	log.Println("cloning repo ", repo)
-
-	r, fs, err := cloneRepo(auth, repo)
-	if err != nil {
-		log.Println("error with cloning the git repo:", repo)
-		log.Println("error: ", err.Error())
-		return
-	}
-
-	w, err := r.Worktree()
-	if err != nil {
-		log.Println("error with retriving the git worktree for the repo: ", repo)
-		log.Println("error: ", err.Error())
-		return
-	}
-
-	err = w.Checkout(&git.CheckoutOptions{
+func cloneDir(dst, repo, rev, src string, fs billy.Filesystem, wt *git.Worktree) {
+	err := wt.Checkout(&git.CheckoutOptions{
 		Hash: plumbing.NewHash(rev),
 	})
 	if err != nil {
-		log.Println("error with checking out the commit in repo: ", repo)
+		log.Println("error with checking out the commit in repo ", repo)
 		log.Println("error: ", err.Error())
 		return
 	}
@@ -70,7 +70,7 @@ func cloneDir(auth config.Auth, dst, repo, rev, src string) {
 
 }
 
-func cloneRepo(auth config.Auth, repo string) (*git.Repository, billy.Filesystem, error) {
+func cloneRepo(repo string, auth config.Auth) (*git.Repository, billy.Filesystem, error) {
 	// Filesystem abstraction based on memory
 	fs := memfs.New()
 	// Git objects storer based on memory
