@@ -15,6 +15,7 @@ func parseFlags() string {
 }
 
 func main() {
+
 	configFile := parseFlags()
 
 	config, err := config.GetConfig(configFile)
