@@ -18,8 +18,8 @@ type Repo struct {
 }
 
 type Auth struct {
-	Credentials map[string]string `yaml:"credentials"`
 	Type        string            `yaml:"type"`
+	Credentials map[string]string `yaml:"credentials"`
 }
 
 type Directory struct {

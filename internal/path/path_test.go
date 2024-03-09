@@ -1,8 +1,8 @@
-package git
+package path
 
 import "testing"
 
-func TestCreateFulltPath(t *testing.T) {
+func TestFulltPath(t *testing.T) {
 	type test struct {
 		input []string
 		want  string
@@ -17,7 +17,7 @@ func TestCreateFulltPath(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got := createFulltPath(tc.input[0], tc.input[1])
+		got := FulltPath(tc.input[0], tc.input[1])
 		if got != tc.want {
 			t.Errorf("wanted %s, got %s\n", tc.want, got)
 		}

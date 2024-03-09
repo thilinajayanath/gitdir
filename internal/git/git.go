@@ -1,7 +1,7 @@
 package git
 
 import (
-	"fmt"
+	"errors"
 	"io"
 	"log"
 	"os"
@@ -11,9 +11,12 @@ import (
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/thilinajayanath/gitdir/internal/config"
+	"github.com/thilinajayanath/gitdir/internal/path"
 )
 
 type fileInfo struct {
@@ -46,6 +49,72 @@ func CopyGitDir(c config.Config) {
 	}
 }
 
+func cloneRepo(repo string, auth config.Auth) (*git.Repository, billy.Filesystem, error) {
+	// Filesystem abstraction based on memory
+	fs := memfs.New()
+	// Git objects storer based on memory
+	storer := memory.NewStorage()
+
+	co := &git.CloneOptions{URL: repo}
+
+	if auth.Type != "none" {
+		domain, err := getDomain(repo)
+		if err != nil {
+			return &git.Repository{}, fs, err
+		}
+
+		authMethod, err := setupAuth(auth, domain)
+		if err != nil {
+			return &git.Repository{}, fs, err
+		}
+
+		co.Auth = authMethod
+	}
+
+	r, err := git.Clone(storer, fs, co)
+	if err != nil {
+		return &git.Repository{}, fs, err
+	}
+
+	return r, fs, nil
+}
+
+func getDomain(repo string) (string, error) {
+	if strings.HasPrefix(repo, "git") {
+		return strings.Split(strings.Split(repo, "git@")[0], ":")[0], nil
+	} else if strings.HasPrefix(repo, "https") {
+		return strings.Split(strings.Split(repo, "https://")[0], "/")[0], nil
+	}
+
+	return "", errors.New("git repo url is invalid")
+}
+
+func setupAuth(auth config.Auth, domain string) (transport.AuthMethod, error) {
+	switch auth.Type {
+	case "ssh":
+		authMethod, err := ssh.NewPublicKeysFromFile("git", auth.Credentials["key"], "")
+		if err != nil {
+			return nil, err
+		}
+
+		return authMethod, nil
+	case "credential-store":
+		cred, err := getCredentials(domain)
+		if err != nil {
+			return nil, err
+		}
+
+		autheMethod := http.BasicAuth{
+			Username: cred[0].username,
+			Password: cred[0].password,
+		}
+
+		return &autheMethod, nil
+	default:
+		return nil, errors.New("authentication method not found")
+	}
+}
+
 func cloneDir(dst, repo, rev, src string, fs billy.Filesystem, wt *git.Worktree) {
 	err := wt.Checkout(&git.CheckoutOptions{
 		Hash: plumbing.NewHash(rev),
@@ -70,34 +139,6 @@ func cloneDir(dst, repo, rev, src string, fs billy.Filesystem, wt *git.Worktree)
 
 }
 
-func cloneRepo(repo string, auth config.Auth) (*git.Repository, billy.Filesystem, error) {
-	// Filesystem abstraction based on memory
-	fs := memfs.New()
-	// Git objects storer based on memory
-	storer := memory.NewStorage()
-
-	co := &git.CloneOptions{URL: repo}
-
-	if auth.Type != "none" {
-		authMethod, err := ssh.NewPublicKeysFromFile("git", auth.Credentials["key"], "")
-		if err != nil {
-			return &git.Repository{}, fs, err
-		}
-		co.Auth = authMethod
-	}
-
-	r, err := git.Clone(
-		storer,
-		fs,
-		co,
-	)
-	if err != nil {
-		return &git.Repository{}, fs, err
-	}
-
-	return r, fs, nil
-}
-
 func walk(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
 	files, err := srcFs.ReadDir("/")
 	if err != nil {
@@ -105,12 +146,11 @@ func walk(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
 	}
 
 	for _, file := range files {
-
 		filePath := ""
 		if parent != "/" {
-			filePath = createFulltPath(parent, file.Name())
+			filePath = path.FulltPath(parent, file.Name())
 		} else {
-			filePath = createFulltPath("/", file.Name())
+			filePath = path.FulltPath("/", file.Name())
 		}
 
 		fileName <- fileInfo{
@@ -146,14 +186,14 @@ func createFS(dst string, fs billy.Filesystem, fileName <-chan fileInfo, src str
 	}
 
 	for x := range fileName {
-		filePath := createFulltPath(dst, x.path)
+		filePath := path.FulltPath(dst, x.path)
 		if x.isDir {
 			err = os.Mkdir(filePath, 0755)
 			if err != nil {
 				log.Println("dir ", filePath, "creation falied", err.Error())
 			}
 		} else {
-			srcFilePath := createFulltPath(src, x.path)
+			srcFilePath := path.FulltPath(src, x.path)
 			srcFile, err := fs.Open(srcFilePath)
 			if err != nil {
 				log.Println("src", err.Error())
@@ -178,18 +218,4 @@ func createFS(dst string, fs billy.Filesystem, fileName <-chan fileInfo, src str
 			dstFile.Close()
 		}
 	}
-}
-
-func createFulltPath(start, end string) string {
-	splitPath := strings.Split(fmt.Sprintf("%s/%s", start, end), "/")
-
-	path := []string{}
-
-	for _, v := range splitPath {
-		if v != "" {
-			path = append(path, v)
-		}
-	}
-
-	return fmt.Sprintf("/%s", strings.Join(path, "/"))
 }
