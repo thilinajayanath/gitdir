@@ -19,7 +19,7 @@ func TestFulltPath(t *testing.T) {
 	for _, tc := range tests {
 		got := FulltPath(tc.input[0], tc.input[1])
 		if got != tc.want {
-			t.Errorf("wanted %s, got %s\n", tc.want, got)
+			t.Errorf("Wanted %s, got %s\n", tc.want, got)
 		}
 	}
 }

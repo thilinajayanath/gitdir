@@ -2,7 +2,8 @@ package main
 
 import (
 	"flag"
-	"log"
+	"fmt"
+	"os"
 
 	"github.com/thilinajayanath/gitdir/internal/config"
 	"github.com/thilinajayanath/gitdir/internal/git"
@@ -20,7 +21,9 @@ func main() {
 
 	config, err := config.GetConfig(configFile)
 	if err != nil {
-		log.Fatalf("error with loading the configuration from file: %s\n", err.Error())
+		fmt.Println("Unable to load the configuration file")
+		fmt.Println("Error: ", err.Error())
+		os.Exit(1)
 	}
 
 	git.CopyGitDir(config)
