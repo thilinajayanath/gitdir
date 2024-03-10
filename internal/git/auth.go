@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 
@@ -16,7 +15,8 @@ type cred struct {
 	password string
 }
 
-// https://git-scm.com/docs/git-credential-store
+// If git is configured to store credentials, there are several places where
+// they can be stored as mentioned in https://git-scm.com/docs/git-credential-store
 
 func getCredentials(domain string) ([]cred, error) {
 	f, err := getCredFileLocation()
@@ -28,6 +28,10 @@ func getCredentials(domain string) ([]cred, error) {
 	// fileContent := getAuthFileContent(f)
 	return parseAuth(content, domain), nil
 }
+
+// getCredFileLocation checks the default locations for the stored git
+// credential file and returns the first file location that exist.
+// Returns an error if none of the default credential files exist.
 
 func getCredFileLocation() (string, error) {
 	userHome := os.Getenv("HOME")
@@ -44,10 +48,10 @@ func getCredFileLocation() (string, error) {
 		if _, err := os.Stat(credFile); err == nil {
 			return credFile, nil
 		} else if errors.Is(err, os.ErrNotExist) {
-			log.Printf("git credential file %s does not exist\n", credFile)
+			fmt.Printf("Git credential file %s does not exist\n", credFile)
 		} else {
-			log.Printf("%s file information cannot be retrieved \n", credFile)
-			log.Println("error: ", err.Error())
+			fmt.Printf("%s file information cannot be retrieved\n", credFile)
+			fmt.Println("Error: ", err.Error())
 		}
 	}
 
@@ -57,10 +61,10 @@ func getCredFileLocation() (string, error) {
 		if _, err := os.Stat(credFile); err == nil {
 			return credFile, nil
 		} else if errors.Is(err, os.ErrNotExist) {
-			log.Printf("git credential file %s does not exist\n", credFile)
+			fmt.Printf("Git credential file %s does not exist\n", credFile)
 		} else {
-			log.Printf("%s file information cannot be retrieved \n", credFile)
-			log.Println("error: ", err.Error())
+			fmt.Printf("%s file information cannot be retrieved\n", credFile)
+			fmt.Println("Error: ", err.Error())
 		}
 	}
 
@@ -68,10 +72,10 @@ func getCredFileLocation() (string, error) {
 	if _, err := os.Stat(credFile); err == nil {
 		return credFile, nil
 	} else if errors.Is(err, os.ErrNotExist) {
-		log.Printf("default git credential file %s does not exist\n", credFile)
+		fmt.Printf("Default git credential file %s does not exist\n", credFile)
 	} else {
-		log.Printf("%s file information cannot be retrieved \n", credFile)
-		log.Println("error: ", err.Error())
+		fmt.Printf("%s file information cannot be retrieved\n", credFile)
+		fmt.Println("Error: ", err.Error())
 	}
 
 	return "", errors.New("default git credential file cannot be found")
@@ -104,7 +108,9 @@ func parseAuth(arr []string, domain string) []cred {
 
 	for _, v := range arr {
 		x := r.FindSubmatch([]byte(v))
-		c = append(c, cred{username: string(x[1]), password: string(x[2])})
+		if len(x) == 3 {
+			c = append(c, cred{username: string(x[1]), password: string(x[2])})
+		}
 	}
 
 	return c

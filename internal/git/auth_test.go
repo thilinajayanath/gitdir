@@ -3,13 +3,35 @@ package git
 import "testing"
 
 func TestParseAuth(t *testing.T) {
-	testInput := []string{
-		"test:test@github.com",
+	type test struct {
+		content []string
+		domain  string
+		want    [2]string
 	}
 
-	ret := parseAuth(testInput, "github.com")
+	tests := []test{
+		{
+			content: []string{"user-name:password123456!@#$%^@github.com"},
+			domain:  "github.com",
+			want:    [2]string{"user-name", "password123456!@#$%^"},
+		},
+		{
+			content: []string{
+				"https://test123:test123@gitlab.com",
+				"https://asd:asd@github.com",
+			},
+			domain: "gitlab.com",
+			want:   [2]string{"test123", "test123"},
+		},
+	}
 
-	if ret[0].username != "test" || ret[0].password != "test" {
-		t.Errorf("error %s %s", ret[0], ret[1])
+	for _, tc := range tests {
+
+		ret := parseAuth(tc.content, tc.domain)
+		t.Log(ret)
+
+		if ret[0].username != tc.want[0] || ret[0].password != tc.want[1] {
+			t.Errorf("error %s %s", ret[0], ret[1])
+		}
 	}
 }

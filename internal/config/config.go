@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -28,10 +28,11 @@ type Directory struct {
 	Revision string `yaml:"revision"`
 }
 
+// GetConfig return the unmarshaled yaml configuration
 func GetConfig(cf string) (Config, error) {
 	content, err := os.ReadFile(cf)
 	if err != nil {
-		log.Println("error with opening the configuraiton file")
+		fmt.Println("Error with opening the configuraiton file")
 		return Config{}, err
 	}
 
@@ -39,10 +40,10 @@ func GetConfig(cf string) (Config, error) {
 
 	err = yaml.Unmarshal(content, &c)
 	if err != nil {
-		log.Println("error with parsing the configuraiton file")
+		fmt.Println("Error with parsing the configuraiton file")
 		return Config{}, err
 	}
 
-	log.Println("parsed the configuration file successfully")
+	fmt.Println("Parsed the configuration file successfully")
 	return c, nil
 }

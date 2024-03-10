@@ -2,6 +2,7 @@ package git
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -27,21 +28,23 @@ type fileInfo struct {
 
 func CopyGitDir(c config.Config) {
 	for _, repo := range c.Repos {
-		log.Println("cloning repo ", repo.URL)
+		fmt.Println("Cloning repo", repo.URL)
+
 		r, fs, err := cloneRepo(repo.URL, repo.Auth)
 		if err != nil {
-			log.Println("error with cloning the git repo:", repo.URL)
-			log.Println("error: ", err.Error())
+			fmt.Println("Error with cloning the git repo", repo.URL)
+			fmt.Println("Error:", err.Error())
 			continue
 		}
 
 		w, err := r.Worktree()
 		if err != nil {
-			log.Println("error with retriving the git worktree for the repo: ", repo.URL)
-			log.Println("error: ", err.Error())
+			fmt.Println("Error with retriving the git worktree for the repo", repo.URL)
+			fmt.Println("Error:", err.Error())
 			continue
 		}
-		log.Println(repo.URL, "cloned")
+
+		fmt.Println("Cloned repo", repo.URL)
 
 		for _, dir := range repo.Directories {
 			cloneDir(dir.Target, repo.URL, dir.Revision, dir.Source, fs, w)
@@ -120,29 +123,34 @@ func cloneDir(dst, repo, rev, src string, fs billy.Filesystem, wt *git.Worktree)
 		Hash: plumbing.NewHash(rev),
 	})
 	if err != nil {
-		log.Println("error with checking out the commit in repo ", repo)
-		log.Println("error: ", err.Error())
+		fmt.Printf("Error with checking out the %s commit in %s repo\n", rev, repo)
+		fmt.Println("Error:", err.Error())
 		return
 	}
 
 	srcFs, err := fs.Chroot(src)
 	if err != nil {
-		log.Println("error with changing to source directory to ", src)
-		log.Println("error: ", err.Error())
+		fmt.Printf("Error with changing to source directory %s in %s commit in %s repo\n", src, rev, repo)
+		fmt.Println("Error:", err.Error())
 		return
 	}
 
-	log.Println("copying files")
+	fmt.Println("Copying files")
 	dirTreeChan := make(chan fileInfo)
 	go walk(srcFs, "/", dirTreeChan)
-	createFS(dst, fs, dirTreeChan, src)
 
+	err = createFS(dst, fs, dirTreeChan, src)
+	if err != nil {
+		fmt.Println("Error with copying the files")
+		fmt.Println("Error:", err.Error())
+		return
+	}
 }
 
 func walk(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
 	files, err := srcFs.ReadDir("/")
 	if err != nil {
-		log.Println(err.Error())
+		fmt.Println(err.Error())
 	}
 
 	for _, file := range files {
@@ -174,15 +182,15 @@ func walk(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
 	}
 }
 
-func createFS(dst string, fs billy.Filesystem, fileName <-chan fileInfo, src string) {
+func createFS(dst string, fs billy.Filesystem, fileName <-chan fileInfo, src string) error {
 	err := os.RemoveAll(dst)
 	if err != nil {
-		log.Println(err.Error())
+		return err
 	}
 
-	os.MkdirAll(dst, 0755)
+	err = os.MkdirAll(dst, 0755)
 	if err != nil {
-		log.Println(err.Error())
+		return err
 	}
 
 	for x := range fileName {
@@ -190,32 +198,39 @@ func createFS(dst string, fs billy.Filesystem, fileName <-chan fileInfo, src str
 		if x.isDir {
 			err = os.Mkdir(filePath, 0755)
 			if err != nil {
-				log.Println("dir ", filePath, "creation falied", err.Error())
+				fmt.Println("Dir", filePath, "creation falied")
+				return err
 			}
 		} else {
 			srcFilePath := path.FulltPath(src, x.path)
 			srcFile, err := fs.Open(srcFilePath)
 			if err != nil {
-				log.Println("src", err.Error())
+				fmt.Println("Unable to open file", srcFilePath)
+				return err
 			}
 
 			dstFile, err := os.Create(filePath)
 			if err != nil {
-				log.Println("dst", err.Error())
+				fmt.Println("Unable to create the file", dstFile)
+				return err
 			}
 
 			_, err = io.Copy(dstFile, srcFile)
 			if err != nil {
-				log.Println(err.Error())
+				fmt.Printf("Unable to copy file from %s to %s", srcFile.Name(), dstFile.Name())
+				return err
 			}
 
 			err = dstFile.Sync()
 			if err != nil {
-				log.Println(err.Error())
+				fmt.Printf("Unable to commit the %s to disk", dstFile.Name())
+				return err
 			}
 
 			srcFile.Close()
 			dstFile.Close()
 		}
 	}
+
+	return nil
 }
