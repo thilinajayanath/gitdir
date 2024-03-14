@@ -17,7 +17,6 @@ type cred struct {
 
 // If git is configured to store credentials, there are several places where
 // they can be stored as mentioned in https://git-scm.com/docs/git-credential-store
-
 func getCredentials(domain string) ([]cred, error) {
 	f, err := getCredFileLocation()
 	if err != nil {
@@ -32,7 +31,6 @@ func getCredentials(domain string) ([]cred, error) {
 // getCredFileLocation checks the default locations for the stored git
 // credential file and returns the first file location that exist.
 // Returns an error if none of the default credential files exist.
-
 func getCredFileLocation() (string, error) {
 	userHome := os.Getenv("HOME")
 	xdgConfHome := os.Getenv("XDG_CONFIG_HOME")

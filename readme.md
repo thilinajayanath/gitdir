@@ -2,6 +2,9 @@
 
 A cli tool to download a directory from a git repo.
 
+- Works on Linux and macOS
+- Supports build in [git credential store](https://git-scm.com/docs/git-credential-store)
+
 ## Running the application
 
 1. Clone the repo and switch to the repo.
@@ -45,4 +48,14 @@ repos:
       - source: /
         target: /tmp/example
         revision: aaaabbbbccccddddeeeeffffgggghhhhiiiikkkk
+  - url: https://github.com/example-user/private-repo.git
+    auth:
+      type: credential-store
+    directories:
+      - source: /
+        target: /tmp/example
+        revision: aaaabbbbccccddddeeeeffffgggghhhhiiiikkkk
+      - source: /test/data
+        target: /tmp/data
+        revision: aaaabbbbccccddddeeeeyyyygggghhhhiiiikkkk
 ```

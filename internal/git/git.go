@@ -47,18 +47,20 @@ func CopyGitDir(c config.Config) {
 		fmt.Println("Cloned repo", repo.URL)
 
 		for _, dir := range repo.Directories {
-			cloneDir(dir.Target, repo.URL, dir.Revision, dir.Source, fs, w)
+			copyDir(dir.Target, repo.URL, dir.Revision, dir.Source, fs, w)
 		}
 	}
 }
 
+// cloneRepo clones a git repo and returns a billy.Filesystem of that represents
+// all the files of the git repo
 func cloneRepo(repo string, auth config.Auth) (*git.Repository, billy.Filesystem, error) {
 	// Filesystem abstraction based on memory
 	fs := memfs.New()
 	// Git objects storer based on memory
 	storer := memory.NewStorage()
 
-	co := &git.CloneOptions{URL: repo}
+	co := &git.CloneOptions{URL: repo, Progress: os.Stdout}
 
 	if auth.Type != "none" {
 		domain, err := getDomain(repo)
@@ -92,6 +94,8 @@ func getDomain(repo string) (string, error) {
 	return "", errors.New("git repo url is invalid")
 }
 
+// setupAuth creates the authentication parameters for git from the given user
+// configuration
 func setupAuth(auth config.Auth, domain string) (transport.AuthMethod, error) {
 	switch auth.Type {
 	case "ssh":
@@ -118,7 +122,7 @@ func setupAuth(auth config.Auth, domain string) (transport.AuthMethod, error) {
 	}
 }
 
-func cloneDir(dst, repo, rev, src string, fs billy.Filesystem, wt *git.Worktree) {
+func copyDir(dst, repo, rev, src string, fs billy.Filesystem, wt *git.Worktree) {
 	err := wt.Checkout(&git.CheckoutOptions{
 		Hash: plumbing.NewHash(rev),
 	})
@@ -136,8 +140,9 @@ func cloneDir(dst, repo, rev, src string, fs billy.Filesystem, wt *git.Worktree)
 	}
 
 	fmt.Println("Copying files")
+
 	dirTreeChan := make(chan fileInfo)
-	go walk(srcFs, "/", dirTreeChan)
+	go walkFS(srcFs, "/", dirTreeChan)
 
 	err = createFS(dst, fs, dirTreeChan, src)
 	if err != nil {
@@ -145,9 +150,13 @@ func cloneDir(dst, repo, rev, src string, fs billy.Filesystem, wt *git.Worktree)
 		fmt.Println("Error:", err.Error())
 		return
 	}
+
+	fmt.Println("Copied files")
 }
 
-func walk(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
+// walkFS goes through all the directories in a given file system and sends the
+// full path from the root to the given channel.
+func walkFS(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
 	files, err := srcFs.ReadDir("/")
 	if err != nil {
 		fmt.Println(err.Error())
@@ -173,7 +182,7 @@ func walk(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
 				log.Println(err.Error())
 			}
 
-			walk(newSrcFs, filePath, fileName)
+			walkFS(newSrcFs, filePath, fileName)
 		}
 	}
 
@@ -182,6 +191,8 @@ func walk(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
 	}
 }
 
+// createFS retrieve directories and file names from the channel given channel
+// and recreates a folder structure
 func createFS(dst string, fs billy.Filesystem, fileName <-chan fileInfo, src string) error {
 	err := os.RemoveAll(dst)
 	if err != nil {
