@@ -26,12 +26,10 @@ func TestParseAuth(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-
 		ret := parseAuth(tc.content, tc.domain)
-		t.Log(ret)
 
 		if ret[0].username != tc.want[0] || ret[0].password != tc.want[1] {
-			t.Errorf("error %s %s", ret[0], ret[1])
+			t.Errorf("Wanted: %v received: %v\n", tc.want, ret)
 		}
 	}
 }
