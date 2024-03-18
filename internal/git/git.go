@@ -84,11 +84,13 @@ func cloneRepo(repo string, auth config.Auth) (*git.Repository, billy.Filesystem
 	return r, fs, nil
 }
 
+// getDomain retrieves the domain of the git repo URL. Returns error if the
+// URL is not valid
 func getDomain(repo string) (string, error) {
 	if strings.HasPrefix(repo, "git") {
-		return strings.Split(strings.Split(repo, "git@")[0], ":")[0], nil
+		return strings.Split(strings.Split(repo, "git@")[1], ":")[0], nil
 	} else if strings.HasPrefix(repo, "https") {
-		return strings.Split(strings.Split(repo, "https://")[0], "/")[0], nil
+		return strings.Split(strings.Split(repo, "https://")[1], "/")[0], nil
 	}
 
 	return "", errors.New("git repo url is invalid")
