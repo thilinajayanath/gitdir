@@ -1,10 +1,10 @@
 package git
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strings"
 
@@ -60,7 +60,7 @@ func cloneRepo(repo string, auth config.Auth) (*git.Repository, billy.Filesystem
 	// Git objects storer based on memory
 	storer := memory.NewStorage()
 
-	co := &git.CloneOptions{URL: repo, Progress: os.Stdout}
+	co := &git.CloneOptions{URL: repo}
 
 	if auth.Type != "none" {
 		domain, err := getDomain(repo)
@@ -141,13 +141,23 @@ func copyDir(dst, repo, rev, src string, fs billy.Filesystem, wt *git.Worktree) 
 		return
 	}
 
-	fmt.Println("Copying files")
+	fmt.Println("Copying files from", src, "in", repo)
 
 	dirTreeChan := make(chan fileInfo)
-	go walkFS(srcFs, "/", dirTreeChan)
 
-	err = createFS(dst, fs, dirTreeChan, src)
+	ctxCreateFs, cancelCreateFs := context.WithCancelCause(context.Background())
+	ctxWalkFS, cancelWalkFS := context.WithCancel(context.Background())
+
+	go walkFS(ctxWalkFS, cancelCreateFs, srcFs, "/", dirTreeChan)
+
+	err = createFS(ctxCreateFs, cancelWalkFS, dst, fs, dirTreeChan, src)
 	if err != nil {
+		_, ok := <-dirTreeChan
+		if ok {
+			fmt.Println("closing channel")
+			close(dirTreeChan)
+		}
+
 		fmt.Println("Error with copying the files")
 		fmt.Println("Error:", err.Error())
 		return
@@ -158,92 +168,118 @@ func copyDir(dst, repo, rev, src string, fs billy.Filesystem, wt *git.Worktree) 
 
 // walkFS goes through all the directories in a given file system and sends the
 // full path from the root to the given channel.
-func walkFS(srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
-	files, err := srcFs.ReadDir("/")
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-
-	for _, file := range files {
-		filePath := ""
-		if parent != "/" {
-			filePath = path.FulltPath(parent, file.Name())
-		} else {
-			filePath = path.FulltPath("/", file.Name())
-		}
-
-		fileName <- fileInfo{
-			isDir: file.IsDir(),
-			mode:  file.Mode(),
-			path:  filePath,
-		}
-
-		if file.IsDir() {
-			newSrcFs, err := srcFs.Chroot(file.Name())
+func walkFS(ctx context.Context, cancel context.CancelCauseFunc, srcFs billy.Filesystem, parent string, fileName chan<- fileInfo) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			files, err := srcFs.ReadDir("/")
 			if err != nil {
-				log.Println(err.Error())
+				cancel(err)
+				return
 			}
 
-			walkFS(newSrcFs, filePath, fileName)
-		}
-	}
+			for _, file := range files {
+				filePath := ""
+				if parent != "/" {
+					filePath = path.FulltPath(parent, file.Name())
+				} else {
+					filePath = path.FulltPath("/", file.Name())
+				}
 
-	if parent == "/" {
-		close(fileName)
+				fileName <- fileInfo{
+					isDir: file.IsDir(),
+					mode:  file.Mode(),
+					path:  filePath,
+				}
+
+				if file.IsDir() {
+					newSrcFs, err := srcFs.Chroot(file.Name())
+					if err != nil {
+						cancel(err)
+						return
+					}
+
+					walkFS(ctx, cancel, newSrcFs, filePath, fileName)
+				}
+			}
+
+			if parent == "/" {
+				close(fileName)
+			}
+			return
+		}
 	}
 }
 
 // createFS retrieve directories and file names from the channel given channel
 // and recreates a folder structure
-func createFS(dst string, fs billy.Filesystem, fileName <-chan fileInfo, src string) error {
+func createFS(ctx context.Context, cancel context.CancelFunc, dst string, fs billy.Filesystem, fileName <-chan fileInfo, src string) error {
 	err := os.RemoveAll(dst)
 	if err != nil {
+		cancel()
 		return err
 	}
 
 	err = os.MkdirAll(dst, 0755)
 	if err != nil {
+		cancel()
 		return err
 	}
 
-	for x := range fileName {
-		filePath := path.FulltPath(dst, x.path)
-		if x.isDir {
-			err = os.Mkdir(filePath, 0755)
-			if err != nil {
-				fmt.Println("Dir", filePath, "creation falied")
-				return err
-			}
-		} else {
-			srcFilePath := path.FulltPath(src, x.path)
-			srcFile, err := fs.Open(srcFilePath)
-			if err != nil {
-				fmt.Println("Unable to open file", srcFilePath)
-				return err
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			x, ok := <-fileName
+
+			if !ok {
+				return nil
 			}
 
-			dstFile, err := os.Create(filePath)
-			if err != nil {
-				fmt.Println("Unable to create the file", dstFile)
-				return err
-			}
+			filePath := path.FulltPath(dst, x.path)
+			if x.isDir {
+				err = os.Mkdir(filePath, 0755)
+				if err != nil {
+					fmt.Println("Dir", filePath, "creation falied")
+					cancel()
+					return err
+				}
+			} else {
+				srcFilePath := path.FulltPath(src, x.path)
+				srcFile, err := fs.Open(srcFilePath)
 
-			_, err = io.Copy(dstFile, srcFile)
-			if err != nil {
-				fmt.Printf("Unable to copy file from %s to %s", srcFile.Name(), dstFile.Name())
-				return err
-			}
+				if err != nil {
+					fmt.Println("Unable to open file", srcFilePath)
+					cancel()
+					return err
+				}
+				defer srcFile.Close()
 
-			err = dstFile.Sync()
-			if err != nil {
-				fmt.Printf("Unable to commit the %s to disk", dstFile.Name())
-				return err
-			}
+				dstFile, err := os.Create(filePath)
+				if err != nil {
+					fmt.Println("Unable to create the file", dstFile)
+					cancel()
+					return err
+				}
+				defer dstFile.Close()
 
-			srcFile.Close()
-			dstFile.Close()
+				_, err = io.Copy(dstFile, srcFile)
+				if err != nil {
+					fmt.Printf("Unable to copy file from %s to %s", srcFile.Name(), dstFile.Name())
+					cancel()
+					return err
+				}
+
+				err = dstFile.Sync()
+				if err != nil {
+					fmt.Printf("Unable to commit the %s to disk", dstFile.Name())
+					cancel()
+					return err
+				}
+			}
 		}
 	}
-
-	return nil
 }
