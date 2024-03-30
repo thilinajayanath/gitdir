@@ -7,6 +7,10 @@ import (
 	"os"
 	"regexp"
 
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	"github.com/thilinajayanath/gitdir/internal/config"
 	"github.com/thilinajayanath/gitdir/internal/path"
 )
 
@@ -112,4 +116,32 @@ func parseAuth(arr []string, domain string) []cred {
 	}
 
 	return c
+}
+
+// setupAuth creates the authentication parameters for git from the given user
+// configuration
+func setupAuth(auth config.Auth, domain string) (transport.AuthMethod, error) {
+	switch auth.Type {
+	case "ssh":
+		authMethod, err := ssh.NewPublicKeysFromFile("git", auth.Credentials["key"], "")
+		if err != nil {
+			return nil, err
+		}
+
+		return authMethod, nil
+	case "credential-store":
+		cred, err := getCredentials(domain)
+		if err != nil {
+			return nil, err
+		}
+
+		autheMethod := http.BasicAuth{
+			Username: cred[0].username,
+			Password: cred[0].password,
+		}
+
+		return &autheMethod, nil
+	default:
+		return nil, errors.New("authentication method not found")
+	}
 }
