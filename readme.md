@@ -1,9 +1,9 @@
-# gitdir - Work in progress
+# gitdir
 
 A cli tool to download a directory from a git repo.
 
 - Works on Linux and macOS
-- Supports build in [git credential store](https://git-scm.com/docs/git-credential-store)
+- Supports built in [git credential store](https://git-scm.com/docs/git-credential-store)
 
 ## Running the application
 

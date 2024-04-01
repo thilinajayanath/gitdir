@@ -12,9 +12,6 @@ import (
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
-	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/thilinajayanath/gitdir/internal/config"
 	"github.com/thilinajayanath/gitdir/internal/path"
@@ -94,34 +91,6 @@ func getDomain(repo string) (string, error) {
 	}
 
 	return "", errors.New("git repo url is invalid")
-}
-
-// setupAuth creates the authentication parameters for git from the given user
-// configuration
-func setupAuth(auth config.Auth, domain string) (transport.AuthMethod, error) {
-	switch auth.Type {
-	case "ssh":
-		authMethod, err := ssh.NewPublicKeysFromFile("git", auth.Credentials["key"], "")
-		if err != nil {
-			return nil, err
-		}
-
-		return authMethod, nil
-	case "credential-store":
-		cred, err := getCredentials(domain)
-		if err != nil {
-			return nil, err
-		}
-
-		autheMethod := http.BasicAuth{
-			Username: cred[0].username,
-			Password: cred[0].password,
-		}
-
-		return &autheMethod, nil
-	default:
-		return nil, errors.New("authentication method not found")
-	}
 }
 
 func copyDir(dst, repo, rev, src string, fs billy.Filesystem, wt *git.Worktree) {
