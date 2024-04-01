@@ -28,7 +28,20 @@ make build
 
 ## Config file
 
-### Example
+Configuration file is a yaml structure containing the following information.
+
+- One or more git repo(s) from where the files are copied from under the `repos` key.
+- Each git repo has the following configurations.
+  - URL of the git repo (SSH or HTTPS).
+  - One of the following authentication methods.
+    - `none` - If no authentication is required to access the gir repo (For example, for public git repos).
+    - `ssh` - For accessing a git repo using the ssh method. This require the ssh key path to be specified.
+    - `credential-store` - For accessing a git repo using an access token. Credentials are retrieved from the default locations specified [here](https://git-scm.com/docs/git-credential-store)
+  - List of source directory of the repo, local destination path and the git revision.
+
+An example configuration file is shown below.
+
+### Example Configuration File
 
 ```yaml
 repos:
