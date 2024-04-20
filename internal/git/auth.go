@@ -29,7 +29,7 @@ func getCredentials(domain string) ([]cred, error) {
 
 	content := getAuthFileContent(f)
 	// fileContent := getAuthFileContent(f)
-	return parseAuth(content, domain), nil
+	return parseAuth(content, domain)
 }
 
 // getCredFileLocation checks the default locations for the stored git
@@ -102,11 +102,13 @@ func getAuthFileContent(f string) []string {
 	return lines
 }
 
-func parseAuth(arr []string, domain string) []cred {
-	rgx := fmt.Sprintf(`(?:https\:\/\/)?(?P<username>[[:alnum:]-]+)\:(?P<pw>\S+)\@%s`, regexp.QuoteMeta(domain))
-	r := regexp.MustCompile(rgx)
-
+func parseAuth(arr []string, domain string) ([]cred, error) {
 	c := []cred{}
+	rgx := fmt.Sprintf(`(?:https\:\/\/)?(?P<username>[[:alnum:]-]+)\:(?P<pw>\S+)\@%s`, regexp.QuoteMeta(domain))
+	r, err := regexp.Compile(rgx)
+	if err != nil {
+		return c, err
+	}
 
 	for _, v := range arr {
 		x := r.FindSubmatch([]byte(v))
@@ -115,7 +117,7 @@ func parseAuth(arr []string, domain string) []cred {
 		}
 	}
 
-	return c
+	return c, nil
 }
 
 // setupAuth creates the authentication parameters for git from the given user
