@@ -1,4 +1,4 @@
-package main
+package gitdir
 
 import (
 	"flag"
@@ -15,8 +15,7 @@ func parseFlags() string {
 	return *configFile
 }
 
-func main() {
-
+func Run() {
 	configFile := parseFlags()
 
 	config, err := config.GetConfig(configFile)

@@ -4,7 +4,7 @@ run: build
 
 .PHONY: build
 build:
-	go build -o ./bin/gitdir cmd/gitdir/main.go
+	go build -o ./bin/gitdir main.go
 
 .PHONY: test
 test:
