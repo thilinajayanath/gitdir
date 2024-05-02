@@ -5,7 +5,7 @@ A cli tool to download a directory from a git repo.
 - Works on Linux and macOS
 - Supports built in [git credential store](https://git-scm.com/docs/git-credential-store)
 
-## Installing gitdir
+## Installing and running gitdir
 
 Installing gitdir require [golang tool chain](https://go.dev/dl/).
 
@@ -16,7 +16,7 @@ There are two ways to install gitdir.
 ### Install with go tool chain
 1. Install with go tool chain.
 ```bash
-go install github.com/thilinajayanath/gitdir
+go install github.com/thilinajayanath/gitdir/cmd/gitdir@latest
 ```
 
 2. Run the tool with a config file. An example config is shown below.
