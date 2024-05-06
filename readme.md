@@ -22,7 +22,7 @@ go install github.com/thilinajayanath/gitdir/cmd/gitdir@latest
 2. Run the tool with a config file. An example config is shown below.
 
 ```bash
-gitdir -config config.yaml
+<go-path>/bin/gitdir -config config.yaml
 ```
 
 ### Build from source
