@@ -18,6 +18,12 @@ func parseFlags() string {
 func Run() {
 	configFile := parseFlags()
 
+	if configFile == "" {
+		fmt.Println("No configuration file given")
+		fmt.Println("Usage: gitdir -config <file-name>")
+		os.Exit(1)
+	}
+
 	config, err := config.GetConfig(configFile)
 	if err != nil {
 		fmt.Println("Unable to load the configuration file")
