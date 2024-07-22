@@ -16,7 +16,7 @@ There are two ways to install gitdir.
 ### Install with go tool chain
 1. Install with go tool chain.
 ```bash
-go install github.com/thilinajayanath/gitdir/cmd/gitdir@latest
+go install github.com/thilinajayanath/gitdir@latest
 ```
 
 2. Run the tool with a config file. An example config is shown below.
